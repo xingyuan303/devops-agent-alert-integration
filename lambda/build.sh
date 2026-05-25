@@ -17,12 +17,11 @@ pip install --target "$BUILD_DIR" --quiet \
   'boto3>=1.43.0' \
   'botocore>=1.43.0'
 
+echo "==> Injecting DevOps Agent service model..."
+cp -r "$SCRIPT_DIR/botocore-ext/devops-agent" "$BUILD_DIR/botocore/data/devops-agent"
+
 echo "==> Copying Lambda handler..."
 cp "$SCRIPT_DIR/investigation_notifier.py" "$BUILD_DIR/"
-
-# Install DevOps Agent service model (not yet in official botocore)
-# If you have a custom botocore with devops-agent model, install it instead:
-#   pip install --target "$BUILD_DIR" --quiet /path/to/botocore-with-devops-agent.whl
 
 echo "==> Packaging..."
 cd "$BUILD_DIR"
