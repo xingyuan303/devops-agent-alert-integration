@@ -32,7 +32,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 GITHUB_TOKEN_SECRET = os.environ["GITHUB_TOKEN_SECRET"]
-GITHUB_TICKETS_REPO = os.environ["GITHUB_TICKETS_REPO"]   # e.g. xingyuan303/devops-agent-demo-tickets
+GITHUB_TICKETS_REPO = os.environ["GITHUB_TICKETS_REPO"]   # e.g. your-org/devops-agent-tickets
 DEVOPS_AGENT_SPACE_ID = os.environ["DEVOPS_AGENT_SPACE_ID"]
 FEISHU_BOT_SECRET = os.environ.get("FEISHU_BOT_SECRET", "")
 FEISHU_CHAT_ID = os.environ.get("FEISHU_CHAT_ID", "")

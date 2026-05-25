@@ -224,7 +224,7 @@ def _build_card(title, severity, timestamp, source, summary, status, action_url,
         {
             "tag": "button",
             "text": {"tag": "plain_text", "content": "查看监控"},
-            "url": action_url or "https://grafana.abaobao.me",
+            "url": action_url or os.environ.get("GRAFANA_URL", ""),
             "type": "primary",
         },
     ]

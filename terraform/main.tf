@@ -103,6 +103,7 @@ resource "aws_lambda_function" "feishu_notifier" {
       FEISHU_CHAT_ID       = var.feishu_chat_id
       GITHUB_TOKEN_SECRET  = aws_secretsmanager_secret.github_token.arn
       GITHUB_REPO          = var.github_tickets_repo
+      GRAFANA_URL          = var.grafana_url
     }
   }
 }

@@ -59,3 +59,11 @@ variable "investigation_notifier_s3_key" {
   type        = string
   default     = "lambda/investigation_notifier.zip"
 }
+
+# ── Grafana ──────────────────────────────────────────────────────────────────
+
+variable "grafana_url" {
+  description = "Grafana URL for alert card 'View Dashboard' button (e.g. https://grafana.example.com)"
+  type        = string
+  default     = ""
+}
