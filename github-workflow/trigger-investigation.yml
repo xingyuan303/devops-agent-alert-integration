@@ -1,0 +1,118 @@
+name: Trigger DevOps Agent Investigation
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write     # post comments back
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send incident event to DevOps Agent Webhook
+        id: send_event
+        env:
+          WEBHOOK_URL:    ${{ secrets.DEVOPS_AGENT_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.DEVOPS_AGENT_WEBHOOK_SECRET }}
+          ISSUE_NUMBER:   ${{ github.event.issue.number }}
+          ISSUE_TITLE:    ${{ github.event.issue.title }}
+          ISSUE_BODY:     ${{ github.event.issue.body }}
+          ISSUE_URL:      ${{ github.event.issue.html_url }}
+          REPO:           ${{ github.repository }}
+          LABELS_JSON:    ${{ toJson(github.event.issue.labels) }}
+        run: |
+          set -euo pipefail
+
+          # Map GitHub label → DevOps Agent priority (CRITICAL | HIGH | MEDIUM | LOW | MINIMAL)
+          PRIORITY="MEDIUM"
+          if   echo "$LABELS_JSON" | grep -qi "\"name\": *\"critical\""; then PRIORITY="CRITICAL"
+          elif echo "$LABELS_JSON" | grep -qi "\"name\": *\"high\"";     then PRIORITY="HIGH"
+          elif echo "$LABELS_JSON" | grep -qi "\"name\": *\"low\"";      then PRIORITY="LOW"
+          fi
+
+          # Build payload matching the Agent Space Webhook schema
+          # (eventType / incidentId / action / priority / title / description / timestamp / service / data)
+          # incidentId uses <repo>#<number> so downstream Lambda can correlate back to the issue.
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+          INCIDENT_ID="${REPO}#${ISSUE_NUMBER}"
+          export TIMESTAMP INCIDENT_ID PRIORITY
+
+          PAYLOAD=$(python3 - <<'PY'
+          import json, os
+          print(json.dumps({
+              "eventType":   "incident",
+              "incidentId":  os.environ["INCIDENT_ID"],
+              "action":      "created",
+              "priority":    os.environ["PRIORITY"],
+              "title":       os.environ["ISSUE_TITLE"],
+              "description": (os.environ.get("ISSUE_BODY") or "")[:2000],
+              "timestamp":   os.environ["TIMESTAMP"],
+              "service":     "github-issues",
+              "data": {
+                  "githubIssue": {
+                      "repo":    os.environ["REPO"],
+                      "number":  int(os.environ["ISSUE_NUMBER"]),
+                      "htmlUrl": os.environ["ISSUE_URL"],
+                  }
+              },
+          }))
+          PY
+          )
+
+          # HMAC-SHA256(timestamp:payload, secret) base64 encoded
+          SIGNATURE=$(printf '%s:%s' "$TIMESTAMP" "$PAYLOAD" \
+                      | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -binary | base64)
+
+          echo "::group::Request"
+          echo "URL:           $WEBHOOK_URL"
+          echo "Timestamp:     $TIMESTAMP"
+          echo "Incident ID:   $INCIDENT_ID"
+          echo "Priority:      $PRIORITY"
+          echo "Payload bytes: ${#PAYLOAD}"
+          echo "::endgroup::"
+
+          HTTP_CODE=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "x-amzn-event-timestamp: $TIMESTAMP" \
+            -H "x-amzn-event-signature: $SIGNATURE" \
+            -d "$PAYLOAD")
+
+          echo "HTTP $HTTP_CODE"
+          echo "Response body:"
+          cat /tmp/resp.json || true
+          echo
+
+          if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "202" ]]; then
+            echo "::error::Webhook returned $HTTP_CODE"
+            exit 1
+          fi
+
+          # Expose for next step (note: secrets/payload NOT exposed)
+          {
+            echo "incident_id=$INCIDENT_ID"
+            echo "http_code=$HTTP_CODE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post initial comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const incidentId = '${{ steps.send_event.outputs.incident_id }}';
+            const httpCode   = '${{ steps.send_event.outputs.http_code }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## DevOps Agent 调查已触发',
+                '',
+                `- **Incident ID**: \`${incidentId}\``,
+                `- **Webhook 响应**: HTTP ${httpCode}`,
+                `- **状态**: 调查请求已提交，等待 DevOps Agent 处理`,
+                '',
+                `后续状态更新将自动写入此 issue 的 comments 中。`,
+              ].join('\n'),
+            });

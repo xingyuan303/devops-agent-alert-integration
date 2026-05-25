@@ -1,0 +1,20 @@
+# === Required Configuration ===
+
+region       = "us-east-1"
+project_name = "devops-agent-integration"
+
+# DevOps Agent Space ID (AWS Console → DevOps Agent → Agent Spaces)
+devops_agent_space_id = ""
+
+# Feishu Bot (Open Platform → 自建应用)
+feishu_app_id     = ""
+feishu_app_secret = ""
+feishu_chat_id    = ""   # oc_xxx (群设置 → 群号)
+
+# GitHub tickets repo (format: org/repo-name)
+github_tickets_repo = ""
+github_token        = ""   # PAT with repo scope
+
+# S3 bucket for Lambda packages (must exist, used for investigation-notifier 16MB zip)
+lambda_s3_bucket                = ""
+investigation_notifier_s3_key   = "lambda/investigation_notifier.zip"
