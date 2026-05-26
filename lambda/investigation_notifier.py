@@ -112,22 +112,25 @@ def _get_investigation_summary(execution_id):
     """Fetch the investigation_summary_md journal record, return markdown string."""
     if not execution_id:
         return None
-    try:
-        paginator = _devops().get_paginator("list_journal_records")
-        pages = paginator.paginate(
-            agentSpaceId=DEVOPS_AGENT_SPACE_ID,
-            executionId=execution_id,
-            recordType="investigation_summary_md",
-        )
-        for page in pages:
-            for record in page.get("records", []):
-                content = record.get("content", {})
-                # content is a document type — may be dict or raw string
-                if isinstance(content, dict):
-                    return content.get("text") or content.get("markdown") or json.dumps(content)
-                return str(content)
-    except Exception as exc:
-        logger.error("Failed to fetch journal records: %s", exc)
+    import time
+    for attempt in range(3):
+        try:
+            paginator = _devops().get_paginator("list_journal_records")
+            pages = paginator.paginate(
+                agentSpaceId=DEVOPS_AGENT_SPACE_ID,
+                executionId=execution_id,
+                recordType="investigation_summary_md",
+            )
+            for page in pages:
+                for record in page.get("records", []):
+                    content = record.get("content", {})
+                    if isinstance(content, dict):
+                        return content.get("text") or content.get("markdown") or json.dumps(content)
+                    return str(content)
+        except Exception as exc:
+            logger.error("Failed to fetch journal records (attempt %d): %s", attempt + 1, exc)
+        if attempt < 2:
+            time.sleep(5)
     return None
 
 
@@ -403,24 +406,28 @@ def _trigger_mitigation(execution_id):
 
 
 def _get_mitigation_summary(execution_id):
-    """Fetch mitigation_summary_md journal record."""
+    """Fetch mitigation_summary_md journal record with retry."""
     if not execution_id:
         return None
-    try:
-        client = _devops()
-        response = client.list_journal_records(
-            agentSpaceId=DEVOPS_AGENT_SPACE_ID,
-            executionId=execution_id,
-            recordType="mitigation_summary_md",
-        )
-        for record in response.get("records", []):
-            content = record.get("content")
-            if isinstance(content, dict):
-                return content.get("text") or content.get("markdown") or str(content)
-            if isinstance(content, str):
-                return content
-    except Exception as exc:
-        logger.error("Failed to fetch mitigation summary: %s", exc)
+    import time
+    client = _devops()
+    for attempt in range(3):
+        try:
+            response = client.list_journal_records(
+                agentSpaceId=DEVOPS_AGENT_SPACE_ID,
+                executionId=execution_id,
+                recordType="mitigation_summary_md",
+            )
+            for record in response.get("records", []):
+                content = record.get("content")
+                if isinstance(content, dict):
+                    return content.get("text") or content.get("markdown") or str(content)
+                if isinstance(content, str):
+                    return content
+        except Exception as exc:
+            logger.error("Failed to fetch mitigation summary (attempt %d): %s", attempt + 1, exc)
+        if attempt < 2:
+            time.sleep(5)
     return None
 
 
