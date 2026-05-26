@@ -23,6 +23,7 @@ How the task → issue mapping works:
 import json
 import logging
 import os
+import time
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
@@ -112,7 +113,6 @@ def _get_investigation_summary(execution_id):
     """Fetch the investigation_summary_md journal record, return markdown string."""
     if not execution_id:
         return None
-    import time
     for attempt in range(3):
         try:
             paginator = _devops().get_paginator("list_journal_records")
@@ -391,25 +391,10 @@ def _send_feishu_investigation_update(detail_type, task_id, priority, summary_te
 
 # ── Mitigation ────────────────────────────────────────────────────────────────
 
-def _trigger_mitigation(execution_id):
-    """Auto-trigger mitigation plan generation after investigation completes."""
-    try:
-        client = _devops()
-        client.send_message(
-            agentSpaceId=DEVOPS_AGENT_SPACE_ID,
-            executionId=execution_id,
-            content="Please generate a mitigation plan for this investigation.",
-        )
-        logger.info("Mitigation triggered for execution_id=%s", execution_id)
-    except Exception as exc:
-        logger.error("Failed to trigger mitigation: %s", exc)
-
-
 def _get_mitigation_summary(execution_id):
     """Fetch mitigation_summary_md journal record with retry."""
     if not execution_id:
         return None
-    import time
     client = _devops()
     for attempt in range(3):
         try:
@@ -532,8 +517,5 @@ def handler(event, context):
         summary_text = _get_investigation_summary(execution_id) or ""
     issue_url = f"https://github.com/{repo}/issues/{issue_number}" if repo else ""
     _send_feishu_investigation_update(detail_type, task_id, priority, summary_text, issue_url)
-
-    # Auto-trigger mitigation is not supported via API (executionId format mismatch).
-    # Users can request mitigation by sending the pre-filled message in the Feishu group.
 
     return {"statusCode": 200, "body": json.dumps({"comment_url": comment_url})}

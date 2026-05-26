@@ -131,7 +131,7 @@ resource "aws_lambda_function" "investigation_notifier" {
   role          = aws_iam_role.lambda_role.arn
   handler       = "investigation_notifier.handler"
   runtime       = "python3.12"
-  timeout       = 60
+  timeout       = 90
   s3_bucket     = var.lambda_s3_bucket
   s3_key        = var.investigation_notifier_s3_key
 

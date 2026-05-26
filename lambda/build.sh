@@ -14,8 +14,8 @@ mkdir -p "$BUILD_DIR"
 
 echo "==> Installing dependencies..."
 pip install --target "$BUILD_DIR" --quiet \
-  'boto3>=1.43.0' \
-  'botocore>=1.43.0'
+  'boto3==1.43.9' \
+  'botocore==1.43.9'
 
 echo "==> Injecting DevOps Agent service model..."
 cp -r "$SCRIPT_DIR/botocore-ext/devops-agent" "$BUILD_DIR/botocore/data/devops-agent"

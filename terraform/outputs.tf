@@ -14,3 +14,7 @@ output "investigation_notifier_function_name" {
 output "eventbridge_rule_name" {
   value = aws_cloudwatch_event_rule.devops_agent_events.name
 }
+
+output "lambda_s3_bucket" {
+  value = var.lambda_s3_bucket
+}
