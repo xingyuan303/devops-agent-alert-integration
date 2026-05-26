@@ -283,27 +283,30 @@ def _get_tenant_access_token():
 
 
 def _format_summary_for_feishu(summary_text):
-    """Extract key sections from Agent's markdown summary for concise Feishu card."""
+    """Extract key sections from Agent's markdown summary for concise Feishu card.
+
+    Agent output structure: 症状 → 发现 → 根本原因
+    """
     if not summary_text:
         return ""
     lines = summary_text.strip().split("\n")
 
-    action = ""
-    reasoning_lines = []
-    exec_plan_first = ""
+    symptom = ""
+    findings_lines = []
+    root_cause_lines = []
 
     section = None
     for line in lines:
         lower = line.lower().strip()
-        # Detect section headers (## Action, ## Root Cause, ## Recommendation, etc.)
-        if any(kw in lower for kw in ["# action", "# recommendation", "# mitigation", "# fix", "# resolution"]):
-            section = "action"
+        # Detect section headers
+        if any(kw in lower for kw in ["# 症状", "# symptom"]):
+            section = "symptom"
             continue
-        elif any(kw in lower for kw in ["# root cause", "# reasoning", "# analysis", "# why", "# cause"]):
-            section = "reasoning"
+        elif any(kw in lower for kw in ["# 发现", "# finding"]):
+            section = "findings"
             continue
-        elif any(kw in lower for kw in ["# execution", "# plan", "# steps", "# next step", "# remediation step"]):
-            section = "exec_plan"
+        elif any(kw in lower for kw in ["# 根本原因", "# 根因", "# root cause"]):
+            section = "root_cause"
             continue
         elif line.strip().startswith("#"):
             section = "other"
@@ -313,26 +316,26 @@ def _format_summary_for_feishu(summary_text):
         if not stripped:
             continue
 
-        if section == "action" and not action:
-            action = stripped.lstrip("- ").lstrip("* ")
-        elif section == "reasoning" and len(reasoning_lines) < 4:
-            reasoning_lines.append(stripped.lstrip("- ").lstrip("* "))
-        elif section == "exec_plan" and not exec_plan_first:
-            exec_plan_first = stripped.lstrip("- ").lstrip("* ").lstrip("1. ").lstrip("1) ")
+        if section == "symptom" and not symptom:
+            symptom = stripped
+        elif section == "findings" and len(findings_lines) < 3:
+            findings_lines.append(stripped)
+        elif section == "root_cause" and len(root_cause_lines) < 4:
+            root_cause_lines.append(stripped)
 
     # Fallback: if no structured sections found, use first few lines
-    if not action and not reasoning_lines:
+    if not symptom and not root_cause_lines:
         non_empty = [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
-        action = non_empty[0] if non_empty else "见详情"
-        reasoning_lines = non_empty[1:4] if len(non_empty) > 1 else []
+        symptom = non_empty[0] if non_empty else ""
+        root_cause_lines = non_empty[1:5] if len(non_empty) > 1 else []
 
     parts = []
-    if action:
-        parts.append(f"**Action**\n{action}")
-    if reasoning_lines:
-        parts.append(f"**Reasoning**\n" + "\n".join(reasoning_lines))
-    if exec_plan_first:
-        parts.append(f"**Next Step**\n{exec_plan_first}")
+    if symptom:
+        parts.append(f"**症状**\n{symptom}")
+    if findings_lines:
+        parts.append(f"**发现**\n" + "\n".join(findings_lines))
+    if root_cause_lines:
+        parts.append(f"**根本原因**\n" + "\n".join(root_cause_lines))
 
     return "\n\n".join(parts)
 
