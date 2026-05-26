@@ -283,17 +283,33 @@ def _get_tenant_access_token():
 
 
 def _format_summary_for_feishu(summary_text):
-    """Format Agent's investigation summary for Feishu card.
+    """Extract concise summary from Agent's markdown output.
 
-    The summary is already a concise markdown from the Agent (investigation_summary_md).
-    We just trim excessive length for card display. Full content is in GitHub Issue comment.
+    Strategy: take each ## section heading + its first non-empty line.
+    This works regardless of language (中文/English) since we rely on
+    markdown structure (## headings) not keyword matching.
     """
     if not summary_text:
         return ""
-    # Feishu card content limit ~2000 chars for good display
-    if len(summary_text) > 2000:
-        return summary_text[:2000] + "\n\n…（完整内容见工单评论）"
-    return summary_text
+    lines = summary_text.strip().split("\n")
+    sections = []
+    current_heading = None
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## ") or stripped.startswith("# "):
+            current_heading = stripped.lstrip("# ").strip()
+            continue
+        if current_heading and stripped and not stripped.startswith("#"):
+            sections.append(f"**{current_heading}**\n{stripped}")
+            current_heading = None  # only take first line per section
+
+    if not sections:
+        # Fallback: first 3 non-empty lines
+        non_empty = [l.strip() for l in lines if l.strip() and not l.startswith("#")]
+        return "\n".join(non_empty[:3])
+
+    return "\n\n".join(sections)
 
 
 def _send_feishu_investigation_update(detail_type, task_id, priority, summary_text, issue_url):
