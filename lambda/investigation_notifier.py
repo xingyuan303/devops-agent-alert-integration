@@ -349,6 +349,11 @@ def _send_feishu_investigation_update(detail_type, task_id, priority, summary_te
         formatted = _format_summary_for_feishu(summary_text)
         elements.append({"tag": "div", "text": {"tag": "lark_md", "content": formatted}})
 
+    # Add mitigation prompt for completed investigations
+    if detail_type == "Investigation Completed":
+        elements.append({"tag": "div", "text": {"tag": "lark_md",
+            "content": f"💡 如需修复建议，复制以下消息在群里发送：\n`请为调查 {task_id} 生成 mitigation plan`"}})
+
     buttons = []
     inv_url = OPERATOR_WEB_URL_TEMPLATE.format(space_id=DEVOPS_AGENT_SPACE_ID, task_id=task_id)
     buttons.append({"tag": "button", "text": {"tag": "plain_text", "content": "查看调查详情"}, "url": inv_url, "type": "primary"})
@@ -523,8 +528,7 @@ def handler(event, context):
     issue_url = f"https://github.com/{repo}/issues/{issue_number}" if repo else ""
     _send_feishu_investigation_update(detail_type, task_id, priority, summary_text, issue_url)
 
-    # Auto-trigger mitigation plan generation after investigation completes
-    if detail_type == "Investigation Completed" and execution_id:
-        _trigger_mitigation(execution_id)
+    # Auto-trigger mitigation is not supported via API (executionId format mismatch).
+    # Users can request mitigation by sending the pre-filled message in the Feishu group.
 
     return {"statusCode": 200, "body": json.dumps({"comment_url": comment_url})}
