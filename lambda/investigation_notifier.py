@@ -355,7 +355,7 @@ def _send_feishu_investigation_update(detail_type, task_id, priority, summary_te
     # Add mitigation prompt for completed investigations
     if detail_type == "Investigation Completed":
         elements.append({"tag": "div", "text": {"tag": "lark_md",
-            "content": f"💡 如需修复建议，在群里 @DevOps Agent Bot 发送：\n`请为调查 {task_id} 生成 mitigation plan`"}})
+            "content": f"💡 如需修复建议，在群里 @DevOps Agent Bot 发送：\n`请用中文为调查 {task_id} 生成缓解计划`"}})
 
     buttons = []
     inv_url = OPERATOR_WEB_URL_TEMPLATE.format(space_id=DEVOPS_AGENT_SPACE_ID, task_id=task_id)
