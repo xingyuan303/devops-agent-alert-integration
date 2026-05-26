@@ -432,15 +432,12 @@ def _send_feishu_mitigation_result(task_id, priority, summary_text):
     if not token:
         return
 
-    elements = [
-        {"tag": "div", "fields": [
-            {"is_short": True, "text": {"tag": "lark_md", "content": f"**状态**\nMitigation Completed"}},
-            {"is_short": True, "text": {"tag": "lark_md", "content": f"**优先级**\n{priority}"}},
-        ]},
-    ]
+    elements = []
     if summary_text:
         formatted = _format_summary_for_feishu(summary_text)
         elements.append({"tag": "div", "text": {"tag": "lark_md", "content": formatted}})
+    else:
+        elements.append({"tag": "div", "text": {"tag": "lark_md", "content": "_修复建议生成中，请查看工单详情。_"}})
 
     inv_url = OPERATOR_WEB_URL_TEMPLATE.format(space_id=DEVOPS_AGENT_SPACE_ID, task_id=task_id)
     elements.append({"tag": "action", "actions": [
