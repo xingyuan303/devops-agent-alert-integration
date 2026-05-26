@@ -286,11 +286,9 @@ def _get_tenant_access_token():
 
 
 def _format_summary_for_feishu(summary_text):
-    """Extract the final conclusion section from Agent's markdown output.
+    """Extract the root cause / conclusion section from Agent's markdown output.
 
-    Agent reports typically end with the root cause / conclusion section.
-    We take the last ## section's full content (not just first line),
-    skipping intermediate findings and symptoms.
+    Priority: find section with root cause keywords, fallback to last section.
     """
     if not summary_text:
         return ""
@@ -316,14 +314,23 @@ def _format_summary_for_feishu(summary_text):
         sections.append((current_heading, current_lines))
 
     if not sections:
-        # No markdown structure, return first few lines
         non_empty = [l.strip() for l in lines if l.strip()]
         return "\n".join(non_empty[:4])
 
-    # Take the last section (root cause / conclusion)
-    heading, content = sections[-1]
-    body = "\n".join(content)
-    return f"**{heading}**\n{body}"
+    # Find root cause section by keywords
+    root_cause_keywords = ["根本原因", "根因", "root cause", "conclusion", "结论"]
+    for heading, content in sections:
+        if any(kw in heading.lower() for kw in root_cause_keywords):
+            return f"**{heading}**\n" + "\n".join(content)
+
+    # Fallback: take the first section with substantial content (skip short metadata sections)
+    for heading, content in sections:
+        if len(content) >= 2:
+            return f"**{heading}**\n" + "\n".join(content)
+
+    # Last resort
+    heading, content = sections[0]
+    return f"**{heading}**\n" + "\n".join(content)
 
 
 def _send_feishu_investigation_update(detail_type, task_id, priority, summary_text, issue_url):
@@ -456,9 +463,23 @@ def _send_feishu_mitigation_result(task_id, priority, summary_text):
         logger.error("Failed to send Feishu mitigation: %s", exc)
 
 
+# ── Deduplication (EventBridge at-least-once delivery) ────────────────────────
+_processed_events = set()
+
+
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 def handler(event, context):
+    # Deduplicate — EventBridge may deliver the same event multiple times
+    event_id = event.get("id", "")
+    if event_id in _processed_events:
+        logger.info("Skipping duplicate event: %s", event_id)
+        return {"statusCode": 200, "body": "duplicate"}
+    _processed_events.add(event_id)
+    # Keep set bounded (Lambda container reuse)
+    if len(_processed_events) > 100:
+        _processed_events.clear()
+
     logger.info("Event: %s", json.dumps(event))
 
     detail_type = event.get("detail-type", "")
@@ -485,14 +506,14 @@ def handler(event, context):
     if detail_type.startswith("Mitigation"):
         if detail_type == "Mitigation Completed":
             mitigation_summary = _get_mitigation_summary(execution_id) or ""
-            # Post to GitHub Issue only if we got content
             if mitigation_summary:
+                # Post to GitHub Issue
                 repo, issue_number = _resolve_issue_from_task(task_id)
                 if repo and issue_number:
                     comment = "## 🛠 Mitigation Plan\n\n" + mitigation_summary
                     _post_comment(repo, issue_number, comment)
-            # Send to Feishu
-            _send_feishu_mitigation_result(task_id, priority, mitigation_summary)
+                # Send to Feishu
+                _send_feishu_mitigation_result(task_id, priority, mitigation_summary)
         return {"statusCode": 200, "body": f"mitigation event: {detail_type}"}
 
     # ── Investigation events ─────────────────────────────────────────────────
