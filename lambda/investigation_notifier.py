@@ -283,61 +283,17 @@ def _get_tenant_access_token():
 
 
 def _format_summary_for_feishu(summary_text):
-    """Extract key sections from Agent's markdown summary for concise Feishu card.
+    """Format Agent's investigation summary for Feishu card.
 
-    Agent output structure: 症状 → 发现 → 根本原因
+    The summary is already a concise markdown from the Agent (investigation_summary_md).
+    We just trim excessive length for card display. Full content is in GitHub Issue comment.
     """
     if not summary_text:
         return ""
-    lines = summary_text.strip().split("\n")
-
-    symptom = ""
-    findings_lines = []
-    root_cause_lines = []
-
-    section = None
-    for line in lines:
-        lower = line.lower().strip()
-        # Detect section headers
-        if any(kw in lower for kw in ["# 症状", "# symptom"]):
-            section = "symptom"
-            continue
-        elif any(kw in lower for kw in ["# 发现", "# finding"]):
-            section = "findings"
-            continue
-        elif any(kw in lower for kw in ["# 根本原因", "# 根因", "# root cause"]):
-            section = "root_cause"
-            continue
-        elif line.strip().startswith("#"):
-            section = "other"
-            continue
-
-        stripped = line.strip()
-        if not stripped:
-            continue
-
-        if section == "symptom" and not symptom:
-            symptom = stripped
-        elif section == "findings" and len(findings_lines) < 3:
-            findings_lines.append(stripped)
-        elif section == "root_cause" and len(root_cause_lines) < 4:
-            root_cause_lines.append(stripped)
-
-    # Fallback: if no structured sections found, use first few lines
-    if not symptom and not root_cause_lines:
-        non_empty = [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
-        symptom = non_empty[0] if non_empty else ""
-        root_cause_lines = non_empty[1:5] if len(non_empty) > 1 else []
-
-    parts = []
-    if symptom:
-        parts.append(f"**症状**\n{symptom}")
-    if findings_lines:
-        parts.append(f"**发现**\n" + "\n".join(findings_lines))
-    if root_cause_lines:
-        parts.append(f"**根本原因**\n" + "\n".join(root_cause_lines))
-
-    return "\n\n".join(parts)
+    # Feishu card content limit ~2000 chars for good display
+    if len(summary_text) > 2000:
+        return summary_text[:2000] + "\n\n…（完整内容见工单评论）"
+    return summary_text
 
 
 def _send_feishu_investigation_update(detail_type, task_id, priority, summary_text, issue_url):
