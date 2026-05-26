@@ -6,7 +6,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  告警源 (Grafana Alertmanager / CloudWatch Alarm)                            │
+│  告警源 (Grafana Alerting / Prometheus Alertmanager / CloudWatch Alarm)       │
 │       ↓                                                                     │
 │  SNS Topic                                                                  │
 │       ↓                                                                     │
@@ -67,7 +67,7 @@ terraform apply
 
 ### Step 4: 接入告警源
 
-#### Grafana Alertmanager → SNS
+#### Prometheus Alertmanager → SNS
 
 在 Alertmanager 配置中添加 SNS receiver：
 
@@ -112,7 +112,8 @@ aws cloudwatch set-alarm-state \
 
 | 告警源 | 接入方式 | 自动触发调查 |
 |--------|---------|-------------|
-| Grafana Alertmanager | SNS receiver | ✅ severity=critical/high |
+| Grafana Alerting | Contact Point → SNS | ✅ severity=critical/high |
+| Prometheus Alertmanager | SNS receiver | ✅ severity=critical/high |
 | CloudWatch Alarm | Alarm Action → SNS | ✅ state=ALARM |
 | 任何系统 | 发送 JSON 到 SNS | ✅ 需包含 AlarmName 或 alerts 字段 |
 

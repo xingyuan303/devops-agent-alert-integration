@@ -1,5 +1,5 @@
 output "sns_topic_arn" {
-  description = "SNS Topic ARN — point your Grafana Alertmanager or CloudWatch Alarms here"
+  description = "SNS Topic ARN — point your Grafana Alerting, Prometheus Alertmanager, or CloudWatch Alarms here"
   value       = aws_sns_topic.alerts.arn
 }
 
