@@ -102,6 +102,12 @@ your-org/devops-agent-tickets/
 
 ### Step 4: 接入告警源
 
+> 详细配置见 [docs/alert-source-setup.md](docs/alert-source-setup.md)
+
+#### Grafana Alerting → SNS（推荐）
+
+在 Grafana UI → Alerting → Contact Points 添加 AWS SNS 类型，填入 `<terraform output: sns_topic_arn>`。
+
 #### Prometheus Alertmanager → SNS
 
 在 Alertmanager 配置中添加 SNS receiver：
@@ -166,20 +172,48 @@ aws cloudwatch set-alarm-state \
 ## 文件结构
 
 ```
-├── README.md                    本文件
+├── README.md                         本文件
+├── deploy.sh                         一键部署 investigation-notifier Lambda
 ├── lambda/
-│   ├── feishu_notifier.py       告警通知 Lambda
-│   └── investigation_notifier.py 调查结果通知 Lambda
+│   ├── feishu_notifier.py            告警通知 Lambda
+│   ├── investigation_notifier.py     调查结果通知 Lambda
+│   ├── build.sh                      打包脚本（含 DevOps Agent SDK）
+│   └── botocore-ext/                 DevOps Agent service model
 ├── github-workflow/
-│   └── trigger-investigation.yml GitHub Actions → DevOps Agent Webhook
+│   └── trigger-investigation.yml     GitHub Actions → DevOps Agent Webhook
 ├── terraform/
-│   ├── main.tf                  基础设施定义
-│   ├── variables.tf             变量定义
-│   ├── outputs.tf               输出值
-│   └── terraform.tfvars.example 配置模板
+│   ├── main.tf                       基础设施定义
+│   ├── variables.tf                  变量定义
+│   ├── outputs.tf                    输出值
+│   └── terraform.tfvars.example      配置模板
 └── docs/
-    └── troubleshooting.md       常见问题排查
+    ├── alert-source-setup.md         告警源接入指南
+    ├── feishu-setup.md               飞书 App 配置（Lambda 单向通知）
+    ├── feishu-bot-deployment.md      飞书 Bot EKS 部署（双向对话，可选）
+    ├── github-setup.md               GitHub 仓库 + Actions 配置
+    └── troubleshooting.md            常见问题排查
 ```
+
+## 更新部署
+
+修改 `investigation_notifier.py` 后，运行：
+
+```bash
+./deploy.sh
+```
+
+脚本会自动 build → 上传 S3 → 更新 Lambda。
+
+## 卸载
+
+```bash
+cd terraform
+terraform destroy
+```
+
+然后手动清理：
+- 删除 GitHub 工单仓库的 Actions secrets
+- 删除飞书群里的 Bot（可选）
 
 ## 注意事项
 
