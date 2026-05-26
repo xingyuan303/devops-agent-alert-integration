@@ -59,11 +59,46 @@ terraform apply
 
 ### Step 3: 配置 GitHub 仓库
 
-1. 创建一个 GitHub 仓库作为工单仓库（如 `your-org/devops-agent-tickets`）
-2. 将 `github-workflow/trigger.yml` 复制到仓库的 `.github/workflows/` 目录
-3. 在仓库 Settings → Secrets 中添加：
-   - `DEVOPS_AGENT_WEBHOOK_URL` — Agent Space Webhook URL
-   - `DEVOPS_AGENT_WEBHOOK_SECRET` — Webhook HMAC 签名密钥
+#### 3a. 创建工单仓库
+
+创建一个 GitHub 仓库用于存放告警工单（如 `your-org/devops-agent-tickets`）：
+- 可以是空仓库
+- 建议设为 Private（工单可能包含基础设施信息）
+- 仓库名填入 `terraform.tfvars` 的 `github_tickets_repo`（格式：`org/repo-name`）
+
+#### 3b. 创建 GitHub Personal Access Token (PAT)
+
+1. GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Generate new token (classic)
+3. 勾选权限：`repo`（Full control of private repositories）
+4. 生成后复制 token，填入 `terraform.tfvars` 的 `github_token`
+
+> ⚠️ Token 会存入 AWS Secrets Manager，Lambda 通过 Secrets Manager 读取，不会明文暴露。
+
+#### 3c. 添加 Workflow 文件
+
+将本项目 `github-workflow/trigger-investigation.yml` 复制到工单仓库：
+
+```
+your-org/devops-agent-tickets/
+└── .github/
+    └── workflows/
+        └── trigger-investigation.yml
+```
+
+#### 3d. 配置 Repository Secrets
+
+进入工单仓库 → Settings → Secrets and variables → Actions → New repository secret：
+
+| Secret Name | 值 | 获取方式 |
+|-------------|---|---------|
+| `DEVOPS_AGENT_WEBHOOK_URL` | Agent Space Webhook URL | AWS Console → DevOps Agent → Agent Space → Webhook |
+| `DEVOPS_AGENT_WEBHOOK_SECRET` | Webhook HMAC 签名密钥 | 创建 Webhook 时设置的 secret |
+
+#### 3e. 启用 Workflow 权限
+
+进入工单仓库 → Settings → Actions → General → Workflow permissions：
+- 选择 "Read and write permissions"
 
 ### Step 4: 接入告警源
 
