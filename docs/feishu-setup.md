@@ -13,13 +13,15 @@
 
 进入应用 → 应用能力 → 添加能力 → 选择「机器人」
 
-## Step 3: 启用 WebSocket 长连接模式
+## Step 3: 启用 WebSocket 长连接模式（仅双向 Bot 需要）
+
+> 如果只使用 Lambda 单向告警通知，跳过 Step 3 和 Step 4。仅当你需要在群里 @Bot 对话时才需要配置。
 
 进入应用 → 事件与回调 → 选择「使用长连接接收事件」
 
 > 长连接模式下 Bot 无需公网回调地址，适合部署在 VPC 内的场景。
 
-## Step 4: 订阅事件
+## Step 4: 订阅事件（仅双向 Bot 需要）
 
 进入应用 → 事件与回调 → 添加事件：
 
@@ -70,7 +72,7 @@
 ```hcl
 feishu_app_id     = "cli_xxxxxxxxxx"      # Step 1 获取
 feishu_app_secret = "xxxxxxxxxxxxxxxx"     # Step 1 获取
-feishu_chat_id    = "oc_xxxxxxxxxx"        # Step 5 获取
+feishu_chat_id    = "oc_xxxxxxxxxx"        # Step 8 获取
 ```
 
 ## 验证 Bot 是否正常

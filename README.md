@@ -158,10 +158,9 @@ aws cloudwatch set-alarm-state \
 - 颜色按 severity 区分（红/橙/黄/蓝）
 - 按钮：查看监控（跳转 CloudWatch/Grafana）、查看工单（GitHub Issue）
 
-### 调查结果（精简版）
-- **Action** — 一句话说明要改什么
-- **Reasoning** — 3-4 行说明为什么
-- **Next Step** — 第一步操作预览
+### 调查结果
+- 根本原因摘要（Agent 报告最终结论）
+- 如需修复建议，提供一键复制的 @Bot 消息
 - 按钮：查看调查详情（Agent Space）、查看工单
 
 ## 文件结构
@@ -172,7 +171,7 @@ aws cloudwatch set-alarm-state \
 │   ├── feishu_notifier.py       告警通知 Lambda
 │   └── investigation_notifier.py 调查结果通知 Lambda
 ├── github-workflow/
-│   └── trigger.yml              GitHub Actions → DevOps Agent Webhook
+│   └── trigger-investigation.yml GitHub Actions → DevOps Agent Webhook
 ├── terraform/
 │   ├── main.tf                  基础设施定义
 │   ├── variables.tf             变量定义
