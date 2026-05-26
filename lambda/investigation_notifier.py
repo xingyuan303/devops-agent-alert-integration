@@ -381,6 +381,87 @@ def _send_feishu_investigation_update(detail_type, task_id, priority, summary_te
         logger.error("Failed to send Feishu message: %s", exc)
 
 
+# ── Mitigation ────────────────────────────────────────────────────────────────
+
+def _trigger_mitigation(execution_id):
+    """Auto-trigger mitigation plan generation after investigation completes."""
+    try:
+        client = _devops()
+        client.send_message(
+            agentSpaceId=DEVOPS_AGENT_SPACE_ID,
+            executionId=execution_id,
+            content="Please generate a mitigation plan for this investigation.",
+        )
+        logger.info("Mitigation triggered for execution_id=%s", execution_id)
+    except Exception as exc:
+        logger.error("Failed to trigger mitigation: %s", exc)
+
+
+def _get_mitigation_summary(execution_id):
+    """Fetch mitigation_summary_md journal record."""
+    if not execution_id:
+        return None
+    try:
+        client = _devops()
+        response = client.list_journal_records(
+            agentSpaceId=DEVOPS_AGENT_SPACE_ID,
+            executionId=execution_id,
+            recordType="mitigation_summary_md",
+        )
+        for record in response.get("records", []):
+            content = record.get("content")
+            if isinstance(content, dict):
+                return content.get("text") or content.get("markdown") or str(content)
+            if isinstance(content, str):
+                return content
+    except Exception as exc:
+        logger.error("Failed to fetch mitigation summary: %s", exc)
+    return None
+
+
+def _send_feishu_mitigation_result(task_id, priority, summary_text):
+    """Send mitigation plan result to Feishu."""
+    if not FEISHU_CHAT_ID:
+        return
+    token = _get_tenant_access_token()
+    if not token:
+        return
+
+    elements = [
+        {"tag": "div", "fields": [
+            {"is_short": True, "text": {"tag": "lark_md", "content": f"**状态**\nMitigation Completed"}},
+            {"is_short": True, "text": {"tag": "lark_md", "content": f"**优先级**\n{priority}"}},
+        ]},
+    ]
+    if summary_text:
+        formatted = _format_summary_for_feishu(summary_text)
+        elements.append({"tag": "div", "text": {"tag": "lark_md", "content": formatted}})
+
+    inv_url = OPERATOR_WEB_URL_TEMPLATE.format(space_id=DEVOPS_AGENT_SPACE_ID, task_id=task_id)
+    elements.append({"tag": "action", "actions": [
+        {"tag": "button", "text": {"tag": "plain_text", "content": "查看详情"}, "url": inv_url, "type": "primary"},
+    ]})
+
+    card = {
+        "header": {"title": {"tag": "plain_text", "content": "🛠 DevOps Agent 修复建议"}, "template": "orange"},
+        "elements": elements,
+    }
+    payload = json.dumps({"receive_id": FEISHU_CHAT_ID, "msg_type": "interactive", "content": json.dumps(card)}).encode()
+    req = Request(
+        "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
+        data=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read().decode())
+            if result.get("code") != 0:
+                logger.error("Feishu mitigation send failed: %s", result)
+            else:
+                logger.info("Feishu mitigation sent: %s", result.get("data", {}).get("message_id"))
+    except URLError as exc:
+        logger.error("Failed to send Feishu mitigation: %s", exc)
+
+
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 def handler(event, context):
@@ -391,9 +472,9 @@ def handler(event, context):
     metadata = detail.get("metadata", {})
     data = detail.get("data", {})
 
-    # Only handle investigation events
-    if not detail_type.startswith("Investigation"):
-        logger.info("Ignoring non-investigation event: %s", detail_type)
+    # Only handle investigation and mitigation events
+    if not (detail_type.startswith("Investigation") or detail_type.startswith("Mitigation")):
+        logger.info("Ignoring event: %s", detail_type)
         return {"statusCode": 200, "body": "ignored"}
 
     task_id = metadata.get("task_id", "")
@@ -406,6 +487,14 @@ def handler(event, context):
         logger.error("No task_id in event metadata")
         return {"statusCode": 400, "body": "missing task_id"}
 
+    # ── Mitigation events → send result to Feishu ────────────────────────────
+    if detail_type.startswith("Mitigation"):
+        if detail_type == "Mitigation Completed":
+            mitigation_summary = _get_mitigation_summary(execution_id) or ""
+            _send_feishu_mitigation_result(task_id, priority, mitigation_summary)
+        return {"statusCode": 200, "body": f"mitigation event: {detail_type}"}
+
+    # ── Investigation events ─────────────────────────────────────────────────
     # Resolve task → GitHub issue via reference.referenceId (stateless)
     repo, issue_number = _resolve_issue_from_task(task_id)
     if not repo or not issue_number:
@@ -427,5 +516,9 @@ def handler(event, context):
         summary_text = _get_investigation_summary(execution_id) or ""
     issue_url = f"https://github.com/{repo}/issues/{issue_number}" if repo else ""
     _send_feishu_investigation_update(detail_type, task_id, priority, summary_text, issue_url)
+
+    # Auto-trigger mitigation plan generation after investigation completes
+    if detail_type == "Investigation Completed" and execution_id:
+        _trigger_mitigation(execution_id)
 
     return {"statusCode": 200, "body": json.dumps({"comment_url": comment_url})}
