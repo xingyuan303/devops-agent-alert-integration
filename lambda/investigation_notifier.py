@@ -328,7 +328,7 @@ def _send_feishu_investigation_update(detail_type, task_id, priority, summary_te
     if not FEISHU_CHAT_ID:
         return
     # Skip noisy intermediate states
-    if detail_type in ("Investigation In Progress", "Investigation Created", "Investigation Linked"):
+    if detail_type in ("Investigation In Progress", "Investigation Linked"):
         return
     token = _get_tenant_access_token()
     if not token:
