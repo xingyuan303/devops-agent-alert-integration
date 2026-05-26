@@ -283,33 +283,44 @@ def _get_tenant_access_token():
 
 
 def _format_summary_for_feishu(summary_text):
-    """Extract concise summary from Agent's markdown output.
+    """Extract the final conclusion section from Agent's markdown output.
 
-    Strategy: take each ## section heading + its first non-empty line.
-    This works regardless of language (中文/English) since we rely on
-    markdown structure (## headings) not keyword matching.
+    Agent reports typically end with the root cause / conclusion section.
+    We take the last ## section's full content (not just first line),
+    skipping intermediate findings and symptoms.
     """
     if not summary_text:
         return ""
     lines = summary_text.strip().split("\n")
+
+    # Parse into sections: [(heading, [content_lines]), ...]
     sections = []
     current_heading = None
+    current_lines = []
 
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("## ") or stripped.startswith("# "):
+            if current_heading:
+                sections.append((current_heading, current_lines))
             current_heading = stripped.lstrip("# ").strip()
-            continue
-        if current_heading and stripped and not stripped.startswith("#"):
-            sections.append(f"**{current_heading}**\n{stripped}")
-            current_heading = None  # only take first line per section
+            current_lines = []
+        elif current_heading:
+            if stripped:
+                current_lines.append(stripped)
+
+    if current_heading:
+        sections.append((current_heading, current_lines))
 
     if not sections:
-        # Fallback: first 3 non-empty lines
-        non_empty = [l.strip() for l in lines if l.strip() and not l.startswith("#")]
-        return "\n".join(non_empty[:3])
+        # No markdown structure, return first few lines
+        non_empty = [l.strip() for l in lines if l.strip()]
+        return "\n".join(non_empty[:4])
 
-    return "\n\n".join(sections)
+    # Take the last section (root cause / conclusion)
+    heading, content = sections[-1]
+    body = "\n".join(content)
+    return f"**{heading}**\n{body}"
 
 
 def _send_feishu_investigation_update(detail_type, task_id, priority, summary_text, issue_url):
