@@ -487,10 +487,16 @@ def handler(event, context):
         logger.error("No task_id in event metadata")
         return {"statusCode": 400, "body": "missing task_id"}
 
-    # ── Mitigation events → send result to Feishu ────────────────────────────
+    # ── Mitigation events → send result to Feishu + GitHub Issue ────────────────
     if detail_type.startswith("Mitigation"):
         if detail_type == "Mitigation Completed":
             mitigation_summary = _get_mitigation_summary(execution_id) or ""
+            # Post to GitHub Issue
+            repo, issue_number = _resolve_issue_from_task(task_id)
+            if repo and issue_number:
+                comment = "## 🛠 Mitigation Plan\n\n" + (mitigation_summary or "_No summary available._")
+                _post_comment(repo, issue_number, comment)
+            # Send to Feishu
             _send_feishu_mitigation_result(task_id, priority, mitigation_summary)
         return {"statusCode": 200, "body": f"mitigation event: {detail_type}"}
 
